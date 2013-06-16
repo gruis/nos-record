@@ -1,5 +1,5 @@
 module GemVault
-  class Server
+  module Server
     VERSION = '0.0.0'
   end
 end
