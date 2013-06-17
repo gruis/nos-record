@@ -9,7 +9,6 @@ module GemVault
       # @param [String] path
       def initialize(path = GemVault::Server.rootdir)
         if !File.exist?(path) || !File.directory?(path)
-          # TODO tag the exception
           raise(Errno::ENOENT "Unknown directory - #{path}").extend(Server::Error)
         end
         @path     = path
@@ -31,7 +30,6 @@ module GemVault
       private
 
       def indexer(options)
-        $stderr.puts "Path: #{@path}"
         @indexers[options.keys.join] ||= ::Gem::Indexer.new(@path, options)
       end
 

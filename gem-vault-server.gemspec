@@ -19,5 +19,6 @@ require "rubygems"
   # s.extensions = "ext/extconf.rb"
   s.add_dependency 'builder'
   s.add_dependency 'sinatra'
-  s.add_dependency 'sqlite3'
+  s.add_dependency 'leveldb-ruby'
+  s.add_dependency 'oj'
 end

@@ -3,15 +3,18 @@ PATH
   specs:
     gem-vault-server (0.0.0)
       builder
+      leveldb-ruby
+      oj
       sinatra
-      sqlite3
 
 GEM
   remote: http://rubygems.org/
   specs:
-    builder (3.1.4)
+    builder (3.2.2)
     coderay (1.0.8)
+    leveldb-ruby (0.15)
     method_source (0.8.1)
+    oj (2.1.0)
     pry (0.9.10)
       coderay (~> 1.0.5)
       method_source (~> 0.8)
@@ -24,7 +27,6 @@ GEM
       rack-protection (~> 1.4)
       tilt (~> 1.3, >= 1.3.4)
     slop (3.3.3)
-    sqlite3 (1.3.7)
     tilt (1.4.1)
 
 PLATFORMS
