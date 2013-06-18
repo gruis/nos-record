@@ -38,6 +38,7 @@ module GemVault
             trans.put(class_key, pack(recs))
           end
         end
+        key
       end
 
       def delete(obj)

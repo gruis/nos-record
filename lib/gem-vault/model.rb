@@ -4,6 +4,13 @@ require "gem-vault/model/search"
 module GemVault
   module Model
 
+    def self.models
+      @models ||= []
+    end
+
+    def self.included(c)
+      Model.models << c
+    end
 
     def save(connection = nil)
       con = my_connection(connection)
