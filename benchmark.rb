@@ -25,7 +25,7 @@ begin
   user       = GemVault::Server::User.new(:id => "benchmark", :email => "benchmark@gemvau.lt")
 
   leveldb        = GemVault::Model::Connection::LevelDB.new(level_path)
-  sqlite_memory  = GemVault::Model::Connection::Sqlite.new ":memory:"
+  sqlite_memory  = GemVault::Model::Connection::Sqlite.new(":memory:")
   sqlite         = GemVault::Model::Connection::Sqlite.new(sqlite_path)
   redis          = GemVault::Model::Connection::Redis.new
   redisock       = GemVault::Model::Connection::Redis.new(:path => "/tmp/redis.sock")
