@@ -7,39 +7,15 @@ module GemVault
 
         PREFIX = "gem-vault"
 
-        def initialize(path = PREFIX)
-          @path   = path
-          @path   = @path[0..-2] if @path[-1] == ":"
-          @db     = ::Redis.new
+        def initialize(opts = {})
+          @path       = opts.delete(:prefix) || PREFIX
+          @path       = @path[0..-2] if @path[-1] == ":"
+          @redis_opts = opts
+          open
         end
 
-        def get(id)
-          unpack(retrv("#{@path}:#{id}"))
-        end
-
-        def save(obj)
-          pack = pack(obj)
-          key  = "#{class_prefix(obj.class)}:#{obj.id}"
-          store("#{@path}:#{key}", pack)
-          key
-        end
-
-        def delete(obj)
-          key = "#{@path}:#{class_prefix(obj.class)}:#{obj.id}"
-          del(key)
-          self
-        end
-
-        def each(klass = nil, &blk)
-          return each_by_class(klass, &blk) unless klass.nil?
-          @db.mget(*@db.keys("#{@path}:*")).map {|j| unpack(j) }.each(&blk)
-        end
 
         private
-
-        def class_prefix(klass)
-          "class:#{klass.to_s.downcase}"
-        end
 
         def retrv(key)
           @db.get(key)
@@ -50,13 +26,29 @@ module GemVault
           self
         end
 
-        def each_by_class(klass, &blk)
-          @db.mget(*@db.keys("#{@path}:#{class_prefix(klass)}:*"))
-            .map{|j| unpack(j) }
-            .each(&blk)
+        def unstore(key)
+          @db.del(key)
         end
 
-      end # class::Sqlite < Connection
+        def open_store
+          ::Redis.new(@redis_opts)
+        end
+
+        def close_store
+          @db.close
+        end
+
+        def values(klass = nil)
+          keys = @db.keys(klass ? "#{key_for_class(klass)}:*" : key("*"))
+          return [] if keys.empty?
+          @db.mget(*keys)
+        end
+
+        def key(k)
+          "#{@path}.#{k}"
+        end
+
+      end # class::Redis < Connection
     end # class::Connection
   end # module::Model
 end # module::GemVault

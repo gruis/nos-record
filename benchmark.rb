@@ -4,60 +4,114 @@ require "benchmark"
 require "bundler"
 Bundler.setup
 require "gem-vault/server/user"
-require "gem-vault/model/connection/sqlite"
-require "gem-vault/model/connection/redis"
+require "gem-vault/model/connection"
 
-leveldb = GemVault::Model::Connection.new
-sqlite  = GemVault::Model::Connection::Sqlite.new
-redis   = GemVault::Model::Connection::Redis.new
-user    = GemVault::Server::User.new(:id => "benchmark", :email => "benchmark@gemvau.lt")
+leveldb    = GemVault::Model::Connection::LevelDB.new
+sqlite     = GemVault::Model::Connection::Sqlite.new
+redis      = GemVault::Model::Connection::Redis.new
+redisock   = GemVault::Model::Connection::Redis.new(:path => "/tmp/redis.sock")
+kcb        = GemVault::Model::Connection::KyotoCabinet.new
+user       = GemVault::Server::User.new(:id => "benchmark", :email => "benchmark@gemvau.lt")
+
 n       = 5_000
 n_human = "#{n / 1000}k"
 
-[["leveldb", leveldb], ["sqlite", sqlite], ["redis", redis]].each do |name, con|
-  $stderr.puts "\n\n#{name}"
-  key = con.save(user)
+to_test = [
+  ["KyotoCabinet", kcb],
+  ["LevelDB", leveldb],
+  ["Redis", redis],
+  ["Redis (Unix Socket)", redis],
+  ["SQLite", sqlite]
+]
 
-  unless con.get(key).is_a?(GemVault::Server::User)
+
+def report_per_sec(tms, n, space)
+  per_sec = tms.real < 1 ? ((1/tms.real) * n) : n / tms.real
+  puts "#{space} #{per_sec.round.to_s.gsub(/(\d)(?=(\d\d\d)+(?!\d))/, "\\1,")}/sec"
+end
+
+to_test.each do |name, con|
+  $stderr.puts "\n\n#{name}"
+  con.save(user)
+  key = user.id
+
+  unless con.get(key, GemVault::Server::User).is_a?(GemVault::Server::User)
     raise "Failed to retrieve user with #{key.inspect} key"
   end
 
-  Benchmark.bm(20) do |x|
-    x.report("(#{n_human}) read:") do
-      n.times { con.get(key) }
-    end
+  r_time  = nil
+  w_time  = nil
+  rw_time = nil
 
-    x.report("(#{n_human}) write:") do
+  Benchmark.bm(20) do |x|
+    r_time = x.report("(#{n_human}) read:") do
+      n.times { con.get(key, GemVault::Server::User) }
+    end
+    report_per_sec(r_time, n, ("    "))
+
+    w_time = x.report("(#{n_human}) write:") do
       n.times { con.save(user) }
     end
+    report_per_sec(w_time, n, ("    "))
 
-    x.report("(#{n_human}) read & write:") do
+    rw_time = x.report("(#{n_human}) read & write:") do
       n.times do |i|
-        con.get(key)
+        con.get(key, GemVault::Server::User)
         con.save(user) if n % 10
       end
     end
+    report_per_sec(rw_time, n, ("    "))
   end
 end
 
 =begin
-leveldb
+
+KyotoCabinet
                            user     system      total        real
-(5k) read:             0.030000   0.000000   0.030000 (  0.017124)
-(5k) write:            0.110000   0.010000   0.120000 (  0.112670)
-(5k) read & write:     0.110000   0.000000   0.110000 (  0.116950)
+(5k) read:             0.030000   0.000000   0.030000 (  0.033991)
+     147,097/sec
+(5k) write:            0.050000   0.000000   0.050000 (  0.055352)
+     90,331/sec
+(5k) read & write:     0.070000   0.010000   0.080000 (  0.072730)
+     68,748/sec
 
 
-sqlite
+LevelDB
                            user     system      total        real
-(5k) read:             0.260000   0.090000   0.350000 (  0.337466)
-(5k) write:            1.140000   3.030000   4.170000 (  7.401213)
-(5k) read & write:     1.420000   3.150000   4.570000 (  7.771793)
+(5k) read:             0.030000   0.000000   0.030000 (  0.032942)
+     151,782/sec
+(5k) write:            0.050000   0.000000   0.050000 (  0.057885)
+     86,378/sec
+(5k) read & write:     0.090000   0.000000   0.090000 (  0.086949)
+     57,505/sec
 
 
-redis
+Redis
                            user     system      total        real
-(5k) read:             0.410000   0.080000   0.490000 (  0.506921)
-(5k) write:            0.390000   0.080000   0.470000 (  0.486716)
-(5k) read & write:     0.810000   0.170000   0.980000 (  1.005607)
+(5k) read:             0.420000   0.100000   0.520000 (  0.536349)
+     9,322/sec
+(5k) write:            0.390000   0.080000   0.470000 (  0.500218)
+     9,996/sec
+(5k) read & write:     0.800000   0.170000   0.970000 (  1.005320)
+     4,974/sec
+
+
+Redis (Unix Socket)
+                           user     system      total        real
+(5k) read:             0.410000   0.090000   0.500000 (  0.509919)
+     9,805/sec
+(5k) write:            0.400000   0.080000   0.480000 (  0.495219)
+     10,097/sec
+(5k) read & write:     0.810000   0.160000   0.970000 (  1.009409)
+     4,953/sec
+
+
+SQLite
+                           user     system      total        real
+(5k) read:             0.220000   0.080000   0.300000 (  0.300650)
+     16,631/sec
+(5k) write:            0.470000   1.520000   1.990000 (  3.549052)
+     1,409/sec
+(5k) read & write:     0.790000   1.600000   2.390000 (  3.976819)
+     1,257/sec
 =end

@@ -5,7 +5,6 @@ module GemVault
   module Server
     class ApiKey
       include Model
-      extend Model::Search
 
       attr_reader :id
       alias :key :id

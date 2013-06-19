@@ -22,5 +22,6 @@ require "rubygems"
   s.add_dependency 'leveldb-ruby'
   s.add_dependency 'sqlite3'
   s.add_dependency 'redis'
+  s.add_dependency 'kyotocabinet-ruby'
   s.add_dependency 'oj'
 end

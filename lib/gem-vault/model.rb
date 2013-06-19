@@ -4,12 +4,44 @@ require "gem-vault/model/search"
 module GemVault
   module Model
 
-    def self.models
-      @models ||= []
-    end
+    class << self
+      def models
+        @models ||= []
+      end
 
-    def self.included(c)
-      Model.models << c
+      def included(c)
+        Model.models << c
+        c.extend(Enumerable)
+        c.instance_eval do
+          attr_writer :default_connection
+
+          def default_connection
+            @default_connection || Model.default_connection
+          end
+
+          def get(id, connection = nil)
+            connection ||= Model.default_connection
+            connection.get(id, self)
+          end
+
+          def each(connection = nil, &blk)
+            connection ||= Model.default_connection
+            connection.each(self).each(&blk)
+          end
+
+          def find_by_attr(attr, val)
+            each.select {|o| o.instance_variable_get(:"@#{attr}") == val }
+          end
+        end
+      end
+
+      def default_connection=(c)
+        @default_connection = c
+      end
+
+      def default_connection
+        @default_connection ||= Connection.new
+      end
     end
 
     def save(connection = nil)
@@ -32,10 +64,10 @@ module GemVault
     private
 
     def my_connection(connection = nil)
-      return connection unless connection.nil?
-      # TODO raise a good error
-      raise "Connection required" unless @_connection
-      @_connection
+      connection ||
+        @_connection ||
+        self.class.default_connection ||
+        Model.default_connection
     end
 
     def never_serialize

@@ -9,42 +9,15 @@ module GemVault
 
         def initialize(path = DBNAME)
           @path   = path
-          @db     = SQLite3::Database.new(@path)
+          open
           @tables = {}
           Model.models.each { |klass| setup_for_class(klass) }
           use("[generic.object]")
         end
 
-        def get(id)
-          unpack(retrv(id))
-        end
-
         def use(table)
           @table = table
           create(table) unless table_exists?(table)
-        end
-
-        def save(obj)
-          pack      = pack(obj)
-          class_key = "idx:class:#{obj.class}"
-          key       = "#{obj.id}"
-          store(key, pack)
-          recs = retrv(class_key)
-          recs = recs ? unpack(recs) : {}
-          recs[key] = true
-          store(class_key, pack(recs))
-          key
-        end
-
-        def delete(obj)
-          class_key = "id:class:#{obj.class}"
-          del(obj.id)
-          recs = retrv(class_key)
-          if recs && recs = unpack(recs)
-            recs.delete(obj.id)
-            store(class_key, pack(recs))
-          end
-          self
         end
 
 
@@ -61,6 +34,14 @@ module GemVault
           self
         end
 
+        def values(klass = nil)
+          sql = klass.nil? ?
+            "SELECT value FROM [generic.object]" :
+            "SELECT value FROM [generic.object] WHERE key LIKE '#{key_for_class(klass)}.%'"
+          $stderr.puts sql.inspect
+          @db.execute(sql).map(&:first)
+        end
+
         def setup_for_class(klass)
           table = "[#{klass}]".downcase.gsub("::", ".")
           create(table) unless table_exists?(table)
@@ -73,7 +54,7 @@ module GemVault
           self
         end
 
-        def del(key, table = @table)
+        def unstore(key, table = @table)
           @db.execute("DELETE FROM #{table} WHERE key='#{key}'")
         end
 
@@ -84,6 +65,14 @@ module GemVault
 
         def tables
           @db.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        end
+
+        def open_store
+          SQLite3::Database.new(@path)
+        end
+
+        def close_store
+          @db.close
         end
 
       end # class::Sqlite < Connection

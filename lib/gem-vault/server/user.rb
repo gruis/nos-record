@@ -4,7 +4,6 @@ module GemVault
   module Server
     class User
       include Model
-      extend Model::Search
 
       attr_accessor :id
       attr_accessor :uid
