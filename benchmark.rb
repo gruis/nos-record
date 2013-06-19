@@ -6,62 +6,71 @@ Bundler.setup
 require "gem-vault/server/user"
 require "gem-vault/model/connection"
 
-leveldb    = GemVault::Model::Connection::LevelDB.new
-sqlite     = GemVault::Model::Connection::Sqlite.new
+level_path  = File.expand_path("../tmp/bench.ldb", __FILE__)
+sqlite_path = File.expand_path("../tmp/bench.sqlite", __FILE__)
+kyoto_path  = File.expand_path("../tmp/bench.kch", __FILE__)
+
+leveldb    = GemVault::Model::Connection::LevelDB.new(level_path)
+sqlite     = GemVault::Model::Connection::Sqlite.new(sqlite_path)
 redis      = GemVault::Model::Connection::Redis.new
 redisock   = GemVault::Model::Connection::Redis.new(:path => "/tmp/redis.sock")
-kcb        = GemVault::Model::Connection::KyotoCabinet.new
+kcb        = GemVault::Model::Connection::KyotoCabinet.new(kyoto_path)
 user       = GemVault::Server::User.new(:id => "benchmark", :email => "benchmark@gemvau.lt")
 
-n       = 5_000
-n_human = "#{n / 1000}k"
+begin
+  n       = 5_000
+  n_human = "#{n / 1000}k"
 
-to_test = [
-  ["KyotoCabinet", kcb],
-  ["LevelDB", leveldb],
-  ["Redis", redis],
-  ["Redis (Unix Socket)", redis],
-  ["SQLite", sqlite]
-]
+  to_test = [
+    ["KyotoCabinet", kcb],
+    ["LevelDB", leveldb],
+    ["Redis", redis],
+    ["Redis (Unix Socket)", redis],
+    ["SQLite", sqlite]
+  ]
 
 
-def report_per_sec(tms, n, space)
-  per_sec = tms.real < 1 ? ((1/tms.real) * n) : n / tms.real
-  puts "#{space} #{per_sec.round.to_s.gsub(/(\d)(?=(\d\d\d)+(?!\d))/, "\\1,")}/sec"
-end
-
-to_test.each do |name, con|
-  $stderr.puts "\n\n#{name}"
-  con.save(user)
-  key = user.id
-
-  unless con.get(key, GemVault::Server::User).is_a?(GemVault::Server::User)
-    raise "Failed to retrieve user with #{key.inspect} key"
+  def report_per_sec(tms, n, space)
+    per_sec = tms.real < 1 ? ((1/tms.real) * n) : n / tms.real
+    puts "#{space} #{per_sec.round.to_s.gsub(/(\d)(?=(\d\d\d)+(?!\d))/, "\\1,")}/sec"
   end
 
-  r_time  = nil
-  w_time  = nil
-  rw_time = nil
+  to_test.each do |name, con|
+    $stderr.puts "\n\n#{name}"
+    con.save(user)
+    key = user.id
 
-  Benchmark.bm(20) do |x|
-    r_time = x.report("(#{n_human}) read:") do
-      n.times { con.get(key, GemVault::Server::User) }
+    unless con.get(key, GemVault::Server::User).is_a?(GemVault::Server::User)
+      raise "Failed to retrieve user with #{key.inspect} key"
     end
-    report_per_sec(r_time, n, ("    "))
 
-    w_time = x.report("(#{n_human}) write:") do
-      n.times { con.save(user) }
-    end
-    report_per_sec(w_time, n, ("    "))
+    r_time  = nil
+    w_time  = nil
+    rw_time = nil
 
-    rw_time = x.report("(#{n_human}) read & write:") do
-      n.times do |i|
-        con.get(key, GemVault::Server::User)
-        con.save(user) if n % 10
+    Benchmark.bm(20) do |x|
+      r_time = x.report("(#{n_human}) read:") do
+        n.times { con.get(key, GemVault::Server::User) }
       end
+      report_per_sec(r_time, n, ("    "))
+
+      w_time = x.report("(#{n_human}) write:") do
+        n.times { con.save(user) }
+      end
+      report_per_sec(w_time, n, ("    "))
+
+      rw_time = x.report("(#{n_human}) read & write:") do
+        n.times do |i|
+          con.get(key, GemVault::Server::User)
+          con.save(user) if n % 10
+        end
+      end
+      report_per_sec(rw_time, n, ("    "))
     end
-    report_per_sec(rw_time, n, ("    "))
   end
+
+ensure
+  [level_path, sqlite_path, kyoto_path].each { |p| FileUtils.rm_rf(p) }
 end
 
 =begin
