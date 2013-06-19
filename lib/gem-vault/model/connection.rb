@@ -12,11 +12,10 @@ module GemVault
       end
 
       def save(obj)
-        raise "#{obj.class} must contain an id" unless obj.respond_to?(:id) && obj.id
+        raise IdRequired.new("#{obj.class} must contain an id") unless obj.respond_to?(:id) && obj.id
         pack = pack(obj)
-        k = key_for(obj.id, obj.class)
-        store(k, pack)
-        k
+        store(key_for(obj.id, obj.class), pack)
+        self
       end
 
       def delete(obj)
@@ -44,23 +43,23 @@ module GemVault
 
 
       def retrv(key)
-        raise NotImplementedError
+        raise ConnectionRequired
       end
 
       def store(key, value)
-        raise NotImplementedError
+        raise ConnectionRequired
       end
 
       def unstore(key, value)
-        raise NotImplementedError
+        raise ConnectionRequired
       end
 
       def open_store
-        raise NotImplementedError
+        raise ConnectionRequired
       end
 
       def close_store
-        raise NotImplementedError
+        raise ConnectionRequired
       end
 
       def key(k)
@@ -80,7 +79,7 @@ module GemVault
       end
 
       def values(klass = nil)
-        raise NotImplementedError
+        raise ConnectionRequired
       end
 
       def pack(obj)

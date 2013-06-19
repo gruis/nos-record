@@ -38,7 +38,6 @@ module GemVault
           sql = klass.nil? ?
             "SELECT value FROM [generic.object]" :
             "SELECT value FROM [generic.object] WHERE key LIKE '#{key_for_class(klass)}.%'"
-          $stderr.puts sql.inspect
           @db.execute(sql).map(&:first)
         end
 

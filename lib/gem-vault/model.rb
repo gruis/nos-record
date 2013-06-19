@@ -1,5 +1,5 @@
+require "gem-vault/model/error"
 require "gem-vault/model/connection"
-require "gem-vault/model/search"
 
 module GemVault
   module Model
@@ -21,7 +21,15 @@ module GemVault
 
           def get(id, connection = nil)
             connection ||= Model.default_connection
-            connection.get(id, self)
+            return connection.get(id, self) if !id.is_a?(Hash)
+            filters = id
+            filter  = filters.shift
+            objs    = find_by_attr(*filter)
+            return objs[0] if filter[0] == :id
+            return objs if filters.empty?
+            attrs[1..-1].inject(objs) do |memo, (attr, val)|
+              memo.select{|o| o.instance_variable_get(:"@#{attr}") == val }
+            end
           end
 
           def each(connection = nil, &blk)
@@ -29,8 +37,8 @@ module GemVault
             connection.each(self).each(&blk)
           end
 
-          def find_by_attr(attr, val)
-            each.select {|o| o.instance_variable_get(:"@#{attr}") == val }
+          def find_by_attr(attr, val, connection = nil)
+            each(connection).select {|o| o.instance_variable_get(:"@#{attr}") == val }
           end
         end
       end
@@ -43,6 +51,8 @@ module GemVault
         @default_connection ||= Connection.new
       end
     end
+
+    attr_reader :_connection
 
     def save(connection = nil)
       con = my_connection(connection)
