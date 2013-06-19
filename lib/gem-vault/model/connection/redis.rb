@@ -39,7 +39,7 @@ module GemVault
         end
 
         def values(klass = nil)
-          keys = @db.keys(klass ? "#{key_for_class(klass)}:*" : key("*"))
+          keys = @db.keys(klass ? "#{key_for_class(klass)}.*" : key("*"))
           return [] if keys.empty?
           @db.mget(*keys)
         end

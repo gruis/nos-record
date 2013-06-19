@@ -30,9 +30,13 @@ module GemVault
         end
 
         def values(klass = nil)
-          return @db.map{|k,v| v }.each if klass.nil?
-          recs = @db.get_bulk(@db.match_prefix(key_for_class(klass)))
-          recs && recs.values
+          unless klass.nil?
+            recs = @db.get_bulk(@db.match_prefix(key_for_class(klass)))
+            return recs ? recs.values : []
+          end
+          recs = []
+          @db.each_value { |v| recs << v[0] }
+          return recs
         end
 
         def close_store
