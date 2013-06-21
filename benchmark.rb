@@ -3,13 +3,24 @@
 require "benchmark"
 require "bundler"
 Bundler.setup
-require "gem-vault/server/user"
-require "gem-vault/model/connection"
+require "nos-record"
+require "nos-record/client"
 require "securerandom"
 
 def report_per_sec(tms, n, space)
   per_sec = tms.real < 1 ? ((1/tms.real) * n) : n / tms.real
   puts "#{space} #{per_sec.round.to_s.gsub(/(\d)(?=(\d\d\d)+(?!\d))/, "\\1,")}/sec"
+end
+
+class User
+  include NosRecord::Model
+  attr_accessor :id
+  attr_accessor :email
+  def initialize(attrs = {})
+    attrs.each do |k,v|
+      instance_variable_set(:"@#{k}", v)
+    end
+  end
 end
 
 level_path  = File.expand_path("../tmp/bench.ldb", __FILE__)
@@ -20,16 +31,17 @@ begin
   n       = 5_000
   n_human = "#{n / 1000}k"
 
-  rand_users = n.times.map { |i| GemVault::Server::User.new(:id => i.to_s, :email => "bench.#{i}@gemvau.lt") }
+  user       = User.new(:id => "benchmark", :email => "benchmark@gemvau.lt")
+  rand_users = n.times.map { |i| User.new(:id => i.to_s, :email => "bench.#{i}@gemvau.lt") }
   user_ids   = []
-  user       = GemVault::Server::User.new(:id => "benchmark", :email => "benchmark@gemvau.lt")
 
-  leveldb        = GemVault::Model::Connection::LevelDB.new(level_path)
-  sqlite_memory  = GemVault::Model::Connection::Sqlite.new(":memory:")
-  sqlite         = GemVault::Model::Connection::Sqlite.new(sqlite_path)
-  redis          = GemVault::Model::Connection::Redis.new
-  redisock       = GemVault::Model::Connection::Redis.new(:path => "/tmp/redis.sock")
-  kcb            = GemVault::Model::Connection::KyotoCabinet.new(kyoto_path)
+  leveldb        = NosRecord::Connection::LevelDB.new(level_path)
+  tcp_level      = NosRecord::Client.new("127.0.0.1", 8081)
+  sqlite_memory  = NosRecord::Connection::Sqlite.new(":memory:")
+  sqlite         = NosRecord::Connection::Sqlite.new(sqlite_path)
+  redis          = NosRecord::Connection::Redis.new
+  redisock       = NosRecord::Connection::Redis.new(:path => "/tmp/redis.sock")
+  kcb            = NosRecord::Connection::KyotoCabinet.new(kyoto_path)
 
 
   to_test = [
@@ -37,6 +49,7 @@ begin
     ["LevelDB", leveldb],
     ["Redis", redis],
     ["Redis (Unix Socket)", redis],
+    ["LevelDB (TCP Socket)", tcp_level],
     ["SQLite (Memory)", sqlite_memory],
     ["SQLite", sqlite]
   ]
@@ -46,7 +59,7 @@ begin
     con.save(user)
     key = user.id
 
-    unless con.get(key, GemVault::Server::User).is_a?(GemVault::Server::User)
+    unless con.get(key, User).is_a?(User)
       raise "Failed to retrieve user with #{key.inspect} key"
     end
 
@@ -64,14 +77,14 @@ begin
 
       r_time = x.report("(#{n_human}) read:") do
         n.times do |i|
-          con.get(rand_users[i].id, GemVault::Server::User)
+          con.get(rand_users[i].id, User)
         end
       end
       report_per_sec(r_time, n, ("    "))
 
       rw_time = x.report("(#{n_human}) read & write:") do
         n.times do |i|
-          con.get(rand_users[i].id, GemVault::Server::User)
+          con.get(rand_users[i].id, User)
           con.save(rand_users[i]) if i % 10
         end
       end
@@ -148,5 +161,79 @@ SQLite
      15,842/sec
 (25k) read & write:    4.020000   8.560000  12.580000 ( 21.033940)
      1,189/sec
+
+---
+
+
+KyotoCabinet
+                           user     system      total        real
+(5k) write:            0.030000   0.000000   0.030000 (  0.037107)
+     134,745/sec
+(5k) read:             0.030000   0.000000   0.030000 (  0.027347)
+     182,835/sec
+(5k) read & write:     0.050000   0.000000   0.050000 (  0.051732)
+     96,652/sec
+
+
+LevelDB
+                           user     system      total        real
+(5k) write:            0.030000   0.000000   0.030000 (  0.029306)
+     170,613/sec
+(5k) read:             0.020000   0.000000   0.020000 (  0.024357)
+     205,279/sec
+(5k) read & write:     0.060000   0.010000   0.070000 (  0.061956)
+     80,702/sec
+
+
+Redis
+                           user     system      total        real
+(5k) write:            0.370000   0.070000   0.440000 (  0.451812)
+     11,067/sec
+(5k) read:             0.380000   0.070000   0.450000 (  0.458933)
+     10,895/sec
+(5k) read & write:     0.720000   0.140000   0.860000 (  0.867649)
+     5,763/sec
+
+
+Redis (Unix Socket)
+                           user     system      total        real
+(5k) write:            0.360000   0.070000   0.430000 (  0.431496)
+     11,588/sec
+(5k) read:             0.370000   0.060000   0.430000 (  0.450921)
+     11,088/sec
+(5k) read & write:     0.730000   0.140000   0.870000 (  0.876897)
+     5,702/sec
+
+
+LevelDB (TCP Socket)
+                           user     system      total        real
+(5k) write:            0.100000   0.070000   0.170000 (  0.455363)
+     10,980/sec
+(5k) read:             0.110000   0.080000   0.190000 (  0.439179)
+     11,385/sec
+(5k) read & write:     0.240000   0.150000   0.390000 (  0.935725)
+     5,343/sec
+
+
+SQLite (Memory)
+                           user     system      total        real
+(5k) write:            0.160000   0.000000   0.160000 (  0.167402)
+     29,868/sec
+(5k) read:             0.210000   0.010000   0.220000 (  0.207037)
+     24,150/sec
+(5k) read & write:     0.380000   0.000000   0.380000 (  0.385304)
+     12,977/sec
+
+
+SQLite
+                           user     system      total        real
+(5k) write:            0.410000   1.480000   1.890000 (  3.371430)
+     1,483/sec
+(5k) read:             0.240000   0.080000   0.320000 (  0.318559)
+     15,696/sec
+(5k) read & write:     0.730000   1.610000   2.340000 (  4.001395)
+     1,250/sec
+
+
 
 =end

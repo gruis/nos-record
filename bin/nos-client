@@ -1,0 +1,38 @@
+#!/usr/bin/env ruby
+
+require "nos-record/model"
+require "nos-record/client"
+
+module NosRecord
+  module Test
+    class User
+      include Model
+      attr_accessor :id
+      attr_accessor :email
+    end
+  end
+end
+
+class User
+  include NosRecord::Model
+  attr_accessor :id
+  attr_accessor :email
+  def initialize(attrs = {})
+    attrs.each do |k,v|
+      instance_variable_set(:"@#{k}", v)
+    end
+  end
+end
+
+u = User.new(:id => "nos-client", :email => "test@gemvau.lt")
+c = NosRecord::Client.new("127.0.0.1", 8081)
+$stderr.puts "saving"
+$stderr.puts c.save(u)
+
+$stderr.puts "get nos-client"
+$stderr.puts User.get("nos-client", c).inspect
+
+$stderr.puts "values"
+$stderr.puts c.values.inspect
+
+$stderr.puts c.map(&:id)

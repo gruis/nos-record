@@ -1,7 +1,4 @@
-require "gem-vault/model/error"
-require "gem-vault/model/connection"
-
-module GemVault
+module NosRecord
   module Model
 
     class << self
@@ -96,4 +93,4 @@ module GemVault
     end
 
   end # module::Model
-end # module::GemVault
+end # module::NosRecord

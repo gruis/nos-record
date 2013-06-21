@@ -1,6 +1,6 @@
 require "spec_helper"
 
-describe "GemVault::Model::Connection::KyotoCabinet" do
+describe "NosRecord::Connection::KyotoCabinet" do
   let(:path) do
     File.expand_path("../tmp/spec.kch", __FILE__)
   end
@@ -9,7 +9,7 @@ describe "GemVault::Model::Connection::KyotoCabinet" do
   end
   context "#new" do
     let(:connection) do
-      GemVault::Model::Connection::KyotoCabinet.new(path)
+      NosRecord::Connection::KyotoCabinet.new(path)
     end
     it_behaves_like "a connection"
   end

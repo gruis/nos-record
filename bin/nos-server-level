@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby 
+
+require "bundler"
+Bundler.setup
+require "nos-record"
+require "nos-record/server/em"
+
+level_path  = File.expand_path("../../tmp/nos-server.ldb", __FILE__)
+leveldb     = NosRecord::Connection::LevelDB.new(level_path)
+proxy       = NosRecord::Server::ConnectionProxy.proxy(leveldb)
+
+EM.run do
+  EM.start_server("127.0.0.1", 8081, NosRecord::Server::Em, proxy)
+end

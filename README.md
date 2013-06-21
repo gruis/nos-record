@@ -1,4 +1,4 @@
-gem-vault-server
+NosRecord
 ================
 
-Securely host private gems
+Persist Ruby objects in NoSQL datastores
