@@ -1,3 +1,4 @@
+require "nos-record/server"
 require "nos-record/connection"
 module NosRecord
   class Client < Connection
@@ -8,19 +9,19 @@ module NosRecord
     end
 
     def retrv(key)
-      send_request(:retrv, key)
+      send_request(Server::RETRV, key)
     end
 
     def store(key, value)
-      send_request(:store, key, value)
+      send_request(Server::STORE, key, value)
     end
 
     def unstore(key)
-      send_request(:unstore, key)
+      send_request(Server::UNSTORE, key)
     end
 
     def values(klass = nil)
-      vals = (klass ? send_request(:values, klass) : send_request(:values))
+      vals = (klass ? send_request(Server::VALUES, klass) : send_request(Server::VALUES))
       vals ? Oj.load(vals) : []
     end
 
@@ -36,15 +37,21 @@ module NosRecord
 
     private
 
-    def send_request(req, *args)
-      data = "#{req}"
-      data << " #{args.join(" ")}" unless args.empty?
-      @sock.print("#{data.length + 1} #{data}")
-      len = ""
-      len << @sock.recv(1) while len[-1] != " "
-      len = len[0..-2].to_i
+    def send_request(code, *args)
+      body = args.empty? ? "" : args.join(" ")
+      data = [code, body.length].pack("CL")
+      data = "#{data}#{body}"
+      @sock.print(data)
+      wait_for_response
+    end
+
+    def wait_for_response
+      code, len = @sock.recv(5).unpack("CL")
+      # TODO raise errors based on return code
       return nil if len == 0
-      @sock.recv(len - 1)
+      body = @sock.recv(len)
+      body << @sock.recv(len - body.length) while body.length < len
+      body
     end
 
   end # class::Client < Connection

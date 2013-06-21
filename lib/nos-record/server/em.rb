@@ -1,5 +1,6 @@
 require "eventmachine"
 require "nos-record/server/connection-proxy"
+require "nos-record/server"
 
 module NosRecord
   module Server
@@ -10,42 +11,43 @@ module NosRecord
       end
 
       def receive_data(d)
-        @buffer << d
+        # TODO handle more than one request in the buffer
         begin
-          len_end   = @buffer.index(" ") + 1
-          len       = @buffer[0..len_end].to_i + 1
-          meth_data = @buffer[len_end..len]
-          @buffer   = @buffer[len_end + len .. -1] || ""
-          meth, data = meth_data.split(" ", 2)
+          @buffer << d
+          meth, len = @buffer[0..5].unpack("CL")
+          len       = len + 5
+          data      = @buffer[5..len]
+          @buffer   = @buffer[5+len..-1] || ""
         rescue => e
-          send_data("Parse Error: #{e}")
+          send_resp(PARSE_ERROR, "#{e}")
           $stderr.puts e
           $stderr.puts e.backtrace
         end
-
-        begin
-          case meth
-          when 'retrv'
-            send_data(@store.retrv(data))
-          when 'unstore'
-            send_data(@store.unstore(data))
-          when 'store'
-            send_data(@store.store(*data.split(" ", 2)))
-          when 'values'
-            send_data(@store.values(data))
-          else
-            send_data("Request Error: unrecognized request '#{meth}'")
-          end
-        rescue => e
-          send_data("Datastore Error: #{e}")
-          $stderr.puts e
-          $stderr.puts e.backtrace
-        end
+        process_request(meth, data)
       end
 
-      def send_data(d)
-        s = "#{d}"
-        super("#{s.length + 1} #{s}")
+      def process_request(meth, data)
+        case meth
+        when RETRV
+          send_resp(OK, @store.retrv(data))
+        when UNSTORE
+          send_resp(OK, @store.unstore(data))
+        when STORE
+          send_resp(OK, @store.store(*data.split(" ", 2)))
+        when VALUES
+          send_resp(OK, @store.values(data.empty? ? nil : data))
+        else
+          send_resp(REQ_ERROR, "unrecognized request '#{meth}'")
+        end
+      rescue => e
+        send_resp(DS_ERROR, "#{e}")
+        $stderr.puts e
+        $stderr.puts e.backtrace
+      end
+
+      def send_resp(code, body)
+        b = "#{body}"
+        send_data("#{[code, b.length].pack("CL")}#{b}")
       end
 
     end # module::Em

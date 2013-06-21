@@ -33,6 +33,6 @@ $stderr.puts "get nos-client"
 $stderr.puts User.get("nos-client", c).inspect
 
 $stderr.puts "values"
-$stderr.puts c.values.inspect
+$stderr.puts "  #{c.values.length}"
 
-$stderr.puts c.map(&:id)
+$stderr.puts c.map(&:id).length

@@ -23,7 +23,7 @@ module NosRecord
 
     def each(klass = nil, &blk)
       values(klass)
-        .map{|j| unpack(j) }
+        .map{|j| o = unpack(j) }
         .each(&blk)
     end
 
