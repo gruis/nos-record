@@ -5,7 +5,7 @@ require "nos-record/server"
 module NosRecord
   module Server
     module Em
-      def initialize(store)
+      def initialize(store, &blk)
         @store  = store
         @buffer = ""
       end
@@ -14,7 +14,7 @@ module NosRecord
         # TODO handle more than one request in the buffer
         begin
           @buffer << d
-          meth, len = @buffer[0..5].unpack("CL")
+          meth, len = @buffer[0..5].unpack(HDR_FMT)
           len       = len + 5
           data      = @buffer[5..len]
           @buffer   = @buffer[5+len..-1] || ""
@@ -22,6 +22,7 @@ module NosRecord
           send_resp(PARSE_ERROR, "#{e}")
           $stderr.puts e
           $stderr.puts e.backtrace
+          return
         end
         process_request(meth, data)
       end
@@ -47,7 +48,7 @@ module NosRecord
 
       def send_resp(code, body)
         b = "#{body}"
-        send_data("#{[code, b.length].pack("CL")}#{b}")
+        send_data("#{[code, b.length].pack(HDR_FMT)}#{b}")
       end
 
     end # module::Em
