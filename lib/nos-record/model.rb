@@ -1,3 +1,6 @@
+require "nos-record/model/easy-attrs"
+require "nos-record/model/memoize-foreign-attr"
+require "nos-record/model/hide-id-attrs"
 module NosRecord
   module Model
 
@@ -51,6 +54,14 @@ module NosRecord
 
     attr_reader :_connection
 
+    def initialize
+      @_new = true
+    end
+
+    def new?
+      @_new
+    end
+
     def save(connection = nil)
       con = my_connection(connection)
       begin
@@ -58,6 +69,7 @@ module NosRecord
         con.save(self)
       ensure
         restore_filtered(filtered)
+        remove_instance_variable(:@_new) if instance_variable_defined?(:@_new)
       end
       self
     end
@@ -66,6 +78,11 @@ module NosRecord
       con = my_connection(connection)
       con.delete(self)
       self
+    end
+
+    def to_hash
+      ivs = (instance_variables - never_serialize)
+      Hash[ivs.map{ |iv| ["#{iv}"[1..-1], instance_variable_get(iv)] }]
     end
 
     private
@@ -78,14 +95,14 @@ module NosRecord
     end
 
     def never_serialize
-      [:@_connection]
+      [:@_connection, :@_new]
     end
 
     def filter_before_save
       filtered = never_serialize
         .select{|i| instance_variable_defined?(i) }
-        .map{|i| remove_instance_variable(i) }
-      Hash[ never_serialize.zip(filtered) ]
+        .map{|i| [i, remove_instance_variable(i)] }
+      Hash[ filtered ]
     end
 
     def restore_filtered(eles)
