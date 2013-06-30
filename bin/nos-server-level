@@ -10,5 +10,5 @@ leveldb     = NosRecord::Connection::LevelDB.new(level_path)
 proxy       = NosRecord::Server::ConnectionProxy.proxy(leveldb)
 
 EM.run do
-  EM.start_server("127.0.0.1", 8081, NosRecord::Server::Em, proxy) 
+  EM.start_server("127.0.0.1", 8081, NosRecord::Server::Em, proxy)
 end
