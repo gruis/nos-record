@@ -42,10 +42,12 @@ begin
   redis          = NosRecord::Connection::Redis.new
   redisock       = NosRecord::Connection::Redis.new(:path => "/tmp/redis.sock")
   kcb            = NosRecord::Connection::KyotoCabinet.new(kyoto_path)
+  kt             = NosRecord::Connection::KyotoTycoon.new("http://localhost:1978/")
 
 
   to_test = [
     ["KyotoCabinet", kcb],
+    ["KyotoTycoon", kt],
     ["LevelDB", leveldb],
     ["Redis", redis],
     ["Redis (Unix Socket)", redis],
