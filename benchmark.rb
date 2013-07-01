@@ -176,6 +176,16 @@ KyotoCabinet
      101,939/sec
 
 
+KyotoTycoon
+                           user     system      total        real
+(5k) write:            0.170000   0.090000   0.260000 (  0.591140)
+     8,458/sec
+(5k) read:             0.150000   0.060000   0.210000 (  0.449323)
+     11,128/sec
+(5k) read & write:     0.300000   0.130000   0.430000 (  0.942016)
+     5,308/sec
+
+
 LevelDB
                            user     system      total        real
 (5k) write:            0.030000   0.000000   0.030000 (  0.028667)

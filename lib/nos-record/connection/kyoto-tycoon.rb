@@ -19,6 +19,25 @@ module NosRecord
         self.open
       end
 
+      def status
+        normalize_aaresults(rpc("status"))
+      end
+
+      def report
+        normalize_aaresults(rpc("report"))
+      end
+
+      def echo(val)
+        rpc("echo", val => "").keys.first
+      end
+
+      def increment(key, num = 1)
+        rpc("increment", 'key' => key, 'num' => num)["num"].first.to_i
+      end
+
+      def include?(key)
+        rpc_request('check', 'key' => key).code == 200
+      end
 
       protected
 
@@ -27,20 +46,21 @@ module NosRecord
       end
 
       def retrv(key)
-        res = @db.request(Net::HTTP::Get::new(rest_key(key)))
-        res.code.to_i != 200 ? nil : res.body
+        res = rest_request('GET', rest_key(key))
+        res.code != 200 ? nil : res.body
       end
 
       def store(key, val)
-        unless @db.request(Net::HTTP::Put.new(rest_key(key)), val).code.to_i == 201
-          raise("set error '#{key}': #{db.error}")
+        resp = rest_request('PUT', rest_key(key), val)
+        unless resp.code == 201
+          raise("set error '#{key}': #{resp.body}")
         end
         self
       end
 
       def unstore(key)
-        res = @db.request(Net::HTTP::Delete::new(rest_key(key)))
-        res.code.to_i == 204
+        res = rest_request('DELETE', rest_key(key))
+        res.code == 204
       end
 
       def values(klass = nil)
@@ -53,46 +73,74 @@ module NosRecord
 
       private
 
+      Response  = Struct.new(:code, :content_type, :body)
+      RPC_TMPL = "POST %s HTTP/1.1\r\nContent-Length: %d\r\nContent-Type: text/tab-separated-values; colenc=%s\r\n\r\n%s"
+      REST_TMPL = "%s %s HTTP/1.1\r\nContent-Length: %d\r\n\r\n%s"
+      GET_TMPL  = "GET %s HTTP/1.1\r\n\r\n"
+
       def close_store
-        @db.finish
+        @db.close
       end
 
       def open_store
-        ua = Net::HTTP.new(@url.host, @url.port)
-        ua.read_timeout = @timeout
-        ua.start
-        ua
+        sock = ::TCPSocket.new(@url.host, @url.port)
       end
 
 
       def match_prefix(prefix)
-        data = rpc_request("match_prefix", {:prefix => prefix})
+        data = rpc("match_prefix", {:prefix => prefix})
         num = data.delete('num')
         data.keys.map{|k| k[1..-1] }
       end
 
       def get_bulk(keys)
-        data = rpc_request('get_bulk', Hash[keys.map{|k| ["_#{k}"] }])
+        data = rpc('get_bulk', Hash[keys.map{|k| ["_#{k}"] }])
         data.delete("num")
         Hash[data.map{|k,vs| [k[1..-1], vs[0]] }]
       end
 
 
-      def rpc_get_request(meth, params = {})
-        qs = params.map{|k,v| "#{k}=#{v}"}.join("&")
-        req = Net::HTTP::Get.new("/rpc/#{meth}?#{qs}")
-        res = @db.request(req)
-        raise res.body unless [200, 450].include?(res.code.to_i)
-        decode_response(res)
+      def rest_request(meth, path, params = "")
+        if meth == 'GET'
+          if !params.empty?
+            path = "#{path}?#{params.map{|k,v| "#{k}=#{v}"}.join("&")}"
+          end
+          request = GET_TMPL % [path]
+        else
+          request = REST_TMPL % [meth, path, params.bytesize, params]
+        end
+        @db.write(request)
+        return rpc_response
+      end
+
+      def rpc(meth, params = {})
+        decode_response(rpc_request(meth, params))
       end
 
       def rpc_request(meth, params = {})
-        req = Net::HTTP::Post.new("/rpc/#{meth}")
-        req.content_type = "text/tab-separated-values; colenc=B"
-        req.body = encode_params(params)
-        res = @db.request(req)
-        raise res.body unless [200, 450].include?(res.code.to_i)
-        decode_response(res)
+        query   = encode_params(params)
+        request = RPC_TMPL % ["/rpc/#{meth}", query.bytesize, "B", query]
+        @db.write(request)
+        rpc_response
+      end
+
+      def rpc_response
+        status       = @db.gets[9, 3]
+        bodylen      = 0
+        body         = ""
+        content_type = ""
+        while (line = @db.gets)
+          if line[0..13] == 'Content-Type: '
+            content_type = line[14..-1].chomp
+            next
+          end
+          if line[0..15] == 'Content-Length: '
+            bodylen = line[16..-1].chomp.to_i
+            next
+          end
+          break if line == "\r\n"
+        end
+        Response.new(status.to_i, content_type, @db.read(bodylen))
       end
 
       def encode_params(params)
@@ -143,6 +191,10 @@ module NosRecord
           key, *rest = line.chomp.split("\t")
           [key, rest]
         end
+      end
+
+      def normalize_aaresults(data)
+        Hash[data.map{|k,vs| [k, vs[0]] }]
       end
 
     end # class::KyotoCabinet < Connection
